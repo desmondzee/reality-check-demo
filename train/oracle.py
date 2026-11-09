@@ -145,6 +145,7 @@ def rollout(task_id: str, seed: int, render: bool = False) -> dict:
     oracle = ScriptedOracle()
     oracle.reset(env)
     images, states, actions = [], [], []
+    cup_xy, other_xy = [], []
     success = False
     for _ in range(env.spec.episode_length):
         action = oracle.act(env)
@@ -152,6 +153,8 @@ def rollout(task_id: str, seed: int, render: bool = False) -> dict:
             images.append(obs.images["top"].copy())
             states.append(_state(obs))
             actions.append([*action.values, action.gripper])
+            cup_xy.append(env.data.xpos[env.cup_body][:2].copy())
+            other_xy.append(_other_xy(env))
         result = env.step(action)
         obs = result.obs
         success = bool(result.success)
@@ -162,7 +165,18 @@ def rollout(task_id: str, seed: int, render: bool = False) -> dict:
         out["images"] = images
         out["states"] = states
         out["actions"] = actions
+        out["cup_xy"] = cup_xy
+        out["other_xy"] = other_xy
     return out
+
+
+def _other_xy(env: CupsEnv) -> np.ndarray:
+    kind = env.params.kind
+    if kind == "place":
+        return env.data.mocap_pos[env.target_mocap][:2].copy()
+    if kind in ("stack", "pick"):
+        return env.data.xpos[env.cup2_body][:2].copy()
+    return env.data.xpos[env.cup_body][:2].copy()
 
 
 def _state(obs) -> list[float]:

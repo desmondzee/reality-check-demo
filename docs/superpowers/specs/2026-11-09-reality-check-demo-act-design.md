@@ -18,8 +18,8 @@ A contract-complete participant submission in `reality-check-demo`: a Docker pol
 
 1. Privileged scripted oracle (true cup and target poses + damped-least-squares IK on `kin/ur12e_kin.xml`) rolls out the five public tasks inside `CupsEnv`.
 2. Only `success=True` episodes are kept, JPEG-round-tripped at quality 90, and stored as compressed numpy episodes (128×128 image, 20-D proprio, 7-D action, task index).
-3. A small action-chunking transformer (ACT-style CNN encoder + transformer encoder/decoder, chunk length 8) is trained with uv on those demos. The loss is masked MSE on normalized joint deltas and gripper.
-4. `ActPolicy.load()` reads `/weights/config.json` and `/weights/act.pt`. `act()` decodes `top`, resizes to 128, and returns a clamped `joint_delta`.
+3. Action-chunk BC did not hold a grasp once the arm left the demonstrated states. The shipped network is a CNN localizer: it predicts cup xy (and the place/stack target) from the overhead image. The same IK waypoint tracker used by the oracle converts that prediction into `joint_delta`.
+4. `CupPolicy.load()` reads `/weights/config.json` and `/weights/localizer.pt`. `act()` memoises `(episode_id, step)` so a runner retry does not advance the tracker.
 5. Practice scoring uses the Reality Check engine container and `rc_runner.practice` on jarvis (`~/Documents/reality-check-demo`).
 
 Demo budget is skewed toward tip, lift, and pick-red, with place and stack included so one multi-task policy covers `RC_EVAL_TASKS=*`.

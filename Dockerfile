@@ -6,17 +6,17 @@ FROM python:3.11-slim-bookworm
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libgomp1 \
+        libgomp1 libglib2.0-0 libgl1 libosmesa6 \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cu128
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir torch==2.9.0 --index-url ${TORCH_INDEX} \
-    && pip install --no-cache-dir numpy pillow
+    && pip install --no-cache-dir numpy pillow "mujoco==3.5.0"
 
 COPY . /app
 RUN pip install --no-cache-dir ./rc_sdk
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 MUJOCO_GL=osmesa
 CMD ["python", "-m", "rc_sdk", "--manifest", "manifest.json", \
-     "--policy", "policy.act_policy:ActPolicy"]
+     "--policy", "policy.cup_policy:CupPolicy"]

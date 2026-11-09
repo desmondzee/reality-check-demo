@@ -4,7 +4,7 @@ Participant-style submission for the UR12e + Robotiq 2F-140 cup cell (contract v
 
 The container serves `GET /healthz`, `GET /readyz`, and `POST /act` via `rc_sdk`. Weights are not in git. `manifest.json` points at the public Hugging Face repo `desmondzee/reality-check-demo-act`, and the runner mounts that snapshot at `/weights`.
 
-`policy/act_policy.py` loads `config.json` + `act.pt` and returns a schema-v2 `joint_delta` (6 arm deltas, `|Δq| ≤ 0.05`, gripper in `[0, 1]`). The network is a small action-chunking transformer; inference executes the first step of the chunk so control stays closed-loop. `act()` is a pure function of the observation envelope.
+`policy/cup_policy.py` loads `config.json` + `localizer.pt` from `/weights`. A small CNN predicts the cup (and, for place/stack/pick, the second object) in metres. `policy/tracker.py` turns that into a schema-v2 `joint_delta` with the same IK waypoints as the oracle. `(episode_id, step)` is memoised so a retry does not advance the tracker.
 
 ## Layout
 
@@ -32,12 +32,10 @@ Needs a checkout of [reality-check](https://github.com/w3joe/reality-check) next
 cd train
 uv sync
 uv run python eval_oracle.py --seeds 0-9          # privileged IK oracle
-uv run python collect_demos.py --seeds 0-19       # keep successful episodes
-uv run --group learn python train_act.py --steps 4000 --out ../runs/act
-uv run --no-sync python dagger.py --beta 0.5         # oracle labels on policy states
-uv run --no-sync python train_act.py --steps 6000 \
-  --data ../data/demos,../data/dagger --out ../runs/act \
+uv run python collect_localize.py --seeds 0-19
+uv run --group learn python train_localizer.py --steps 3000 \
   --push desmondzee/reality-check-demo-act
+uv run --no-sync python eval_cup.py --seeds 0-4
 ```
 
 On the DGX Spark, install the CUDA wheel before training so it is not replaced by a CPU build:
