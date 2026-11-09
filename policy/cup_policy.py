@@ -1,7 +1,7 @@
-"""Schema v2 policy: localizer weights from /weights, IK tracker for the arm.
+"""Schema v2 policy: pull the arm clear, read the cup from the overhead
+camera, then track the oracle waypoints.
 
-act() memoises (episode_id, step) so a byte-identical retry does not advance
-the tracker. A new episode (or step 0) re-estimates the cup and replans.
+(episode_id, step) is memoised so a byte-identical retry does not advance.
 """
 from __future__ import annotations
 
@@ -12,61 +12,65 @@ from typing import Any
 
 import numpy as np
 
-from policy.act_policy import frame_from_jpeg, tensor_from_uint8
-from policy.localizer import build_localizer, kind_from_task, task_index
-from policy.tracker import Tracker
+from policy.localizer import kind_from_task
+from policy.tracker import OPEN, Tracker
+from policy.vision import COEFS, MIN_PIXELS, REVEAL_XYZ, decode_rgb, mask_count, table_xy
 from rc_sdk.policy import Policy
 
-WEIGHTS = Path(os.environ.get("RC_WEIGHTS", "/weights"))
+OTHER = {"place": "green", "stack": "blue", "pick": "blue"}
 
 
 class CupPolicy(Policy):
     def load(self) -> None:
-        import torch
-
-        cfg = json.loads((WEIGHTS / "config.json").read_text())
-        torch.manual_seed(0)
-        self.torch = torch
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = build_localizer(**cfg["model"])
-        state = torch.load(WEIGHTS / "localizer.pt", map_location="cpu", weights_only=True)
-        self.model.load_state_dict(state)
-        self.model.to(self.device)
-        self.model.eval()
+        weights = Path(os.environ.get("RC_WEIGHTS", "/weights"))
+        raw = json.loads((weights / "affine.json").read_text())
+        self.coefs = {name: np.asarray(raw[name], dtype=float) for name in ("red", "blue", "green")}
         self.tracker = Tracker()
-        self.episode: Any = None
+        self._reset_episode()
         self.memo: tuple[tuple[Any, Any], dict] | None = None
-        self.refined = False
 
-    def _predict(self, obs: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
-        torch = self.torch
-        frame = frame_from_jpeg(obs["images"]["top"])
-        image = tensor_from_uint8(frame).to(self.device)
-        task = torch.tensor([task_index(obs.get("task_id"))], dtype=torch.long, device=self.device)
-        with torch.no_grad():
-            pred = self.model(image, task)[0].detach().cpu().numpy()
-        return pred[:2].astype(float), pred[2:].astype(float)
+    def _reset_episode(self) -> None:
+        self.episode = None
+        self.kind = "lift"
+        self.cup: np.ndarray | None = None
+        self.other: np.ndarray | None = None
+        self.locked = False
+        self.revealing = False
+
+    def _see(self, img: np.ndarray, kind: str) -> np.ndarray | None:
+        uv, n = mask_count(img, kind)
+        if uv is None or n < MIN_PIXELS:
+            return None
+        return table_xy(uv, kind, self.coefs)
 
     def act(self, obs: dict[str, Any]) -> dict[str, Any]:
         key = (obs["episode_id"], obs["step"])
         if self.memo is not None and self.memo[0] == key:
             return self.memo[1]
         proprio = obs.get("proprio") or {}
-        q = np.array(proprio.get("joint_pos") or [0.0] * 6, dtype=float)
-        ee = np.array(proprio.get("ee_pos") or [0.0, 0.0, 0.0], dtype=float)
+        q = np.asarray(proprio.get("joint_pos") or [0.0] * 6, dtype=float)
+        ee = np.asarray(proprio.get("ee_pos") or [0.0, 0.0, 0.0], dtype=float)
         kind = kind_from_task(obs.get("task_id"))
         if obs["episode_id"] != self.episode or obs["step"] == 0:
+            self._reset_episode()
             self.episode = obs["episode_id"]
-            self.refined = False
+            self.kind = kind
             self.tracker.reset(q, kind)
-            cup, other = self._predict(obs)
-            self.tracker.set_goals(cup, None if kind in ("lift", "tip") else other)
-        elif not self.refined and self.tracker.phase >= 1:
-            # Home view is often partly blocked by the arm. Re-estimate at hover.
-            cup, other = self._predict(obs)
-            self.tracker.set_goals(cup, None if kind in ("lift", "tip") else other)
-            self.refined = True
+        img = decode_rgb(obs["images"]["top"])
+        if not self.locked:
+            cup = self._see(img, "red")
+            need = OTHER.get(kind)
+            other = self._see(img, need) if need else None
+            if cup is not None and (need is None or other is not None):
+                q_cmd = self.tracker.q_cmd.copy()
+                self.tracker.reset(q_cmd, kind)
+                self.tracker.set_goals(cup, other)
+                self.cup, self.other, self.locked = cup, other, True
+            else:
+                self.tracker.waypoints = [(REVEAL_XYZ.copy(), OPEN, 2)]
+                self.tracker.phase = 0
+                self.tracker.mode = "track"
         values, grip = self.tracker.act(ee, q)
-        action = {"type": "joint_delta", "values": values, "gripper": grip}
+        action = {"type": "joint_delta", "values": values, "gripper": float(grip)}
         self.memo = (key, action)
         return action
