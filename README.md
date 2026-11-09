@@ -33,7 +33,11 @@ cd train
 uv sync
 uv run python eval_oracle.py --seeds 0-9          # privileged IK oracle
 uv run python collect_demos.py --seeds 0-19       # keep successful episodes
-uv run --group learn python train_act.py --steps 4000 --push desmondzee/reality-check-demo-act
+uv run --group learn python train_act.py --steps 4000 --out ../runs/act
+uv run --no-sync python dagger.py --beta 0.5         # oracle labels on policy states
+uv run --no-sync python train_act.py --steps 6000 \
+  --data ../data/demos,../data/dagger --out ../runs/act \
+  --push desmondzee/reality-check-demo-act
 ```
 
 On the DGX Spark, install the CUDA wheel before training so it is not replaced by a CPU build:

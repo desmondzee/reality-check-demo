@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENGINE = Path(os.environ.get("RC_ENGINE", ROOT.parent / "reality-check" / "engine"))
 sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "rc_sdk"))
 sys.path.insert(0, str(ROOT / "train"))
 
 from collect_demos import jpeg_resize, parse_seeds  # noqa: E402
@@ -62,7 +63,8 @@ def main() -> None:
                 with torch.no_grad():
                     pred = model(image, st, task_t)
                 action = denormalize_action(pred[0, 0]).detach().cpu().tolist()
-                delta = JointDelta(tuple(float(v) for v in action[:6]), float(action[6]))
+                grip = 0.0 if float(action[6]) < 0.5 else 1.0
+                delta = JointDelta(tuple(float(v) for v in action[:6]), grip)
                 result = env.step(delta)
                 obs = result.obs
                 success = bool(result.success)

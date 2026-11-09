@@ -17,7 +17,11 @@ from policy.act_net import CHUNK, build_act_net, normalize_action  # noqa: E402
 
 def load_episodes(folder: Path) -> list[dict]:
     episodes = []
-    for path in sorted(folder.glob("*.npz")):
+    folders = [Path(p) for p in str(folder).split(",") if p]
+    paths = []
+    for one in folders:
+        paths.extend(sorted(one.glob("*.npz")))
+    for path in paths:
         data = np.load(path)
         if not bool(data["success"]):
             continue

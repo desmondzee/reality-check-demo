@@ -61,5 +61,7 @@ class ActPolicy(Policy):
             pred = self.model(image, state, task)
         action = denormalize_action(pred[0, 0]).detach().cpu().tolist()
         values = [float(v) for v in action[:6]]
-        grip = float(action[6])
+        # The oracle gripper is bang-bang. Snap so a 0.1 regression does not
+        # leave the fingers half open and drop the cup.
+        grip = 0.0 if float(action[6]) < 0.5 else 1.0
         return {"type": "joint_delta", "values": values, "gripper": grip}
