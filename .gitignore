@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+build/
+*.egg-info/
+.venv/
+venv/
+
+# NEVER commit weights to this repo — they live on Hugging Face.
+weights/
+*.pt
+*.safetensors
+*.ckpt
+
+# training artifacts
+data/
+runs/
+*.npz
+__pycache__/
+.venv/

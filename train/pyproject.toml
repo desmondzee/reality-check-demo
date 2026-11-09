@@ -1,0 +1,17 @@
+[project]
+name = "rc-demo-train"
+version = "0.1.0"
+description = "Oracle demos and ACT training for the Reality Check cup cell"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "mujoco==3.5.0",
+    "numpy>=2.0",
+    "pillow>=11",
+    "huggingface_hub>=0.26",
+]
+
+[dependency-groups]
+learn = ["torch>=2.5"]
+
+[tool.uv]
+package = false
