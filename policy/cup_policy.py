@@ -20,7 +20,6 @@ from policy.vision import COEFS, MIN_PIXELS, REVEAL_XYZ, decode_rgb, mask_count,
 from rc_sdk.policy import Policy
 
 OTHER = {"place": "green", "stack": "blue", "pick": "blue"}
-REVEAL_STEPS = 0
 
 
 class CupPolicy(Policy):
@@ -82,7 +81,10 @@ class CupPolicy(Policy):
             self.tracker.reset(q, kind)
         img = decode_rgb(obs["images"]["top"])
         if not self.locked:
-            if self.nn and self.reveal_steps < REVEAL_STEPS:
+            red_uv, red_n = mask_count(img, "red")
+            if self.nn and (red_uv is None or red_n < MIN_PIXELS):
+                # The net is accurate once the cup is actually in frame. Move the arm
+                # aside until the overhead camera can see it, then read the weights.
                 self.tracker.waypoints = [(REVEAL_XYZ.copy(), OPEN, 2)]
                 self.tracker.phase = 0
                 self.tracker.mode = "track"
