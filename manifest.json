@@ -2,7 +2,7 @@
   "contract": "v0",
   "port": 8080,
   "weights": {
-    "repo_id": "desmondzee/reality-check-demo-act",
+    "repo_id": "akoniti/reality-check-demo-act",
     "revision": "main"
   }
 }

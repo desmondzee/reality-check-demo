@@ -74,7 +74,7 @@ def main() -> None:
     p.add_argument("--batch", type=int, default=64)
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--push", default="", help="public HF repo id, e.g. desmondzee/reality-check-demo-act")
+    p.add_argument("--push", default="", help="public HF repo id, e.g. akoniti/reality-check-demo-act")
     args = p.parse_args()
 
     random.seed(args.seed)

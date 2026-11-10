@@ -12,7 +12,7 @@ A contract-complete participant submission in `reality-check-demo`: a Docker pol
 - Observation: overhead `top` JPEG 640×480, proprio (`joint_pos`, `joint_vel`, `gripper`, `ee_pos`, `ee_quat`), public `task_id`.
 - Action: `joint_delta` with 6 values, each `|Δq| ≤ 0.05` rad, and `gripper` in `[0, 1]`. This policy returns one `joint_delta` per call.
 - HTTP: `GET /healthz`, `GET /readyz`, `POST /act` via vendored `rc_sdk`. A repeated `(episode_id, step)` returns the memoised action.
-- Weights live only on a public ungated HF repo (`desmondzee/reality-check-demo-act`). The runner mounts them at `/weights`. Nothing under `*.pt`, `*.safetensors`, `*.ckpt`, or `weights/` is committed.
+- Weights live only on a public ungated HF repo (`akoniti/reality-check-demo-act`). The runner mounts them at `/weights`. Nothing under `*.pt`, `*.safetensors`, `*.ckpt`, or `weights/` is committed.
 
 ## Architecture
 
