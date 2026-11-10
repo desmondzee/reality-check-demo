@@ -46,7 +46,8 @@ def main() -> None:
     p.add_argument("--tasks", default=",".join(TASKS))
     p.add_argument("--weights", type=Path, default=ROOT / "runs" / "localizer")
     args = p.parse_args()
-    write_weights(args.weights)
+    if not (args.weights / "model.safetensors").is_file():
+        write_weights(args.weights)
     os.environ["RC_WEIGHTS"] = str(args.weights)
     policy = CupPolicy()
     policy.load()
