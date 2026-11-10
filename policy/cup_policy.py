@@ -20,7 +20,7 @@ from policy.vision import COEFS, MIN_PIXELS, REVEAL_XYZ, decode_rgb, mask_count,
 from rc_sdk.policy import Policy
 
 OTHER = {"place": "green", "stack": "blue", "pick": "blue"}
-REVEAL_STEPS = 10
+REVEAL_STEPS = 0
 
 
 class CupPolicy(Policy):

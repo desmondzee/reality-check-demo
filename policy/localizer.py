@@ -23,15 +23,16 @@ def kind_from_task(task_id: str | None) -> str:
 
 
 def _linear_from_coef(layer, coef: np.ndarray, width: int = 640, height: int = 480) -> None:
-    """nn.Linear(3, 2) matching xy = [u*(W-1), v*(H-1), 1] @ coef, u,v in [0, 1]."""
+    """Map a pixel-center fraction u=(i+0.5)/W back through the full-resolution affine."""
     import torch
 
-    scale_u = float(width - 1)
-    scale_v = float(height - 1)
+    # u_px = u_n * W - 0.5, and xy = u_px * coef[0] + v_px * coef[1] + coef[2].
+    cu, cv, c1 = coef[0], coef[1], coef[2]
+    bias = c1 - 0.5 * cu - 0.5 * cv
     weight = torch.tensor(
         [
-            [scale_u * coef[0, 0], scale_v * coef[1, 0], coef[2, 0]],
-            [scale_u * coef[0, 1], scale_v * coef[1, 1], coef[2, 1]],
+            [width * cu[0], height * cv[0], bias[0]],
+            [width * cu[1], height * cv[1], bias[1]],
         ],
         dtype=torch.float32,
     )
@@ -64,8 +65,8 @@ def build_localizer(image: int = IMG):
         def _uv(self, logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
             b, _, h, w = logits.shape
             prob = torch.softmax((logits * 8).flatten(1), dim=-1).view(b, 1, h, w)
-            xs = torch.linspace(0, 1, w, device=logits.device)
-            ys = torch.linspace(0, 1, h, device=logits.device)
+            xs = (torch.arange(w, device=logits.device) + 0.5) / w
+            ys = (torch.arange(h, device=logits.device) + 0.5) / h
             u = (prob.sum(dim=2) * xs).sum(-1).squeeze(1)
             v = (prob.sum(dim=3) * ys).sum(-1).squeeze(1)
             return u, v
